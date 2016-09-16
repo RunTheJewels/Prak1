@@ -29,11 +29,12 @@ public:
 	void SwapRows(int i, int j);
 	void SwapCols(int i, int j);
 	Coord Max(int i);
-	double elem(int i, int j);
+	double Elem(int i, int j);
 	void SubRows(int i, int j, double t);
+	void SetElem(int i, int j, double t);
 };
 
-double Matrix::elem(int i, int j)
+double Matrix::Elem(int i, int j)
 {
 	return a[i][j];
 }
@@ -85,8 +86,8 @@ void Matrix::SwapCols(int i, int j)
 		}
 }
 
-void Matrix::SubRows(int i, int j, double t) //Не вычитает по-настоящему(не вычитает нулевые по идее метода Гаусса элементы,
-//обнуляет элементы непосредственно под диагональным, чтобы не было ереси типа 1.3248796934e-11)
+void Matrix::SubRows(int i, int j, double t) //Не вычитает нулевые по идее метода Гаусса элементы,
+//обнуляет элементы непосредственно под диагональным, чтобы не было ереси типа 1.3248796934e-11
 {
 	a[j][i]=0;
 	for (int k=i+1; k<y; k++)
@@ -112,6 +113,11 @@ Coord Matrix::Max(int i)
 	return Coord(maxx,maxy);
 }
 
+void Matrix::SetElem(int i, int j, double t)
+{
+	a[i][j]=t;
+}
+
 
 class Vector
 {
@@ -126,6 +132,8 @@ public:
 	void Show();
 	void Swap(int x, int y);
 	void SubElems(int i, int j, double t);
+	double Elem(int i);
+	void SubFromMatrix(int i, double t);
 };
 
 void Vector::Write(int i)
@@ -168,11 +176,18 @@ void Vector::Swap(int x, int y)
 
 void Vector::SubElems(int i, int j, double t)
 {
-	//cout << "SubElems " << a[j] << " " << a[i] << t <<  endl;
 	a[j]=a[j]-t*a[i];
-	//cout << "Res " << a[j] << " " << a[i] << endl;
 }
 
+double Vector::Elem(int i)
+{
+	return a[i];
+}
+
+void Vector::SubFromMatrix(int i, double t)
+{
+	a[i]-=t;
+}
 
 
 class System
@@ -181,13 +196,17 @@ private:
 	Matrix a;
 	Vector right;
 	Vector perm;
-	int x,y;
+	int x,y,ranksys,rankright;
 protected:
 	
 public:
 	void Data();
 	void Show();
 	void Gauss();
+	void Rank();
+	void Solve();
+	void RevGauss();
+	void Solution();
 };
 
 void System::Data()
@@ -197,7 +216,7 @@ void System::Data()
 	cin >> x >> y;
 	a.Create(x,y);
 	right.Create(x);
-	perm.Create(x);
+	perm.Create(y);
 	cout << "Система уравнений\n";
 	for (i=0; i<x; i++)
 	{
@@ -229,20 +248,15 @@ void System::Gauss()
 	for (i=0; (i<x) && (i<y); i++)
 	{
 		max=a.Max(i);
-		//cout << "Шаг" << i << endl;
-		//cout << max.getx() << " " << max.gety() << endl;
-		if (a.elem(max.getx(),max.gety())!=0)
+		if (a.Elem(max.getx(),max.gety())!=0)
 		{
 			a.SwapRows(i,max.getx());
 			a.SwapCols(i,max.gety());
 			right.Swap(i,max.getx());
 			perm.Swap(i,max.gety());
-			//Show();
-			//cout << endl;
 			for (int k=i+1; k<x; k++)
 			{
-				t=a.elem(k,i)/a.elem(i,i);
-				//cout << "Elems" <<a.elem(k,i) << " " << a.elem(i,i) << " " << t << endl;
+				t=a.Elem(k,i)/a.Elem(i,i);
 				a.SubRows(i,k,t);
 				right.SubElems(i,k,t);
 			}
@@ -253,11 +267,104 @@ void System::Gauss()
 	}
 }
 
+void System::Rank() //Исхожу из предположения, что проделан прямой ход
+{
+	int i,j;
+	bool flag=false;
+	for (i=x-1; i>=0; i--)
+	{
+		for (j=0; j<y; j++)
+		{
+			if (a.Elem(i,j)!=0)
+			{
+				flag=true;
+				break;
+			}
+		}
+		if (flag) break;
+	}
+	ranksys=i;
+	for (i=x-1; i>=0; i--)
+	{
+		if (right.Elem(i)!=0)
+		{
+			flag=true;
+			break;
+		}
+	}
+	rankright=i;
+	
+}
+
+void System::RevGauss()
+{
+	double t;
+	for (int i=ranksys; i>=0; i--)
+	{
+		for (int k=i-1; k>=0; k--)
+		{
+			t=a.Elem(k,i)/a.Elem(i,i);
+			a.SetElem(k,i,0);
+			right.SubElems(i,k,t);
+		}
+	}
+}
+
+void System::Solve()
+{
+	if (rankright>ranksys)
+	{
+		cout << "Решений нет";
+	} else
+	{
+		cout << "Система совместна" << endl;
+		if (ranksys==y-1)
+		{
+			RevGauss();
+			cout << "Система имеет единственное решение:" << endl;
+			for (int i=0; i<y; i++)
+			{
+				cout << "x";
+				perm.ShowElem(i);
+				cout << "=" << right.Elem(i)/a.Elem(i,i) << endl;
+			}
+		} else
+		{
+			cout << "Несколько решений" << endl;
+			int k=y-1-ranksys;
+			double t;
+			for (int i=y-1; k>0; k--,i--)
+			{
+				cout << "Введите x" << perm.Elem(i) << "=";
+				cin >> t;
+				for (int j=0; j<= /*или без =*/ranksys; j++)
+				{
+					right.SubFromMatrix(j,a.Elem(j,i)*t);
+				}
+			}
+			RevGauss();
+			cout << "Решение:" << endl;
+			for (int i=0; i<=ranksys; i++)
+			{
+				cout << "x";
+				perm.ShowElem(i);
+				cout << "=" << right.Elem(i)/a.Elem(i,i) << endl;
+			}
+		}
+	}
+}
+
+void System::Solution()
+{
+	Gauss();
+	Rank();
+	Solve();
+}
+
 int main()
 {
 	System sys;
 	sys.Data();
-	sys.Gauss();
-	sys.Show();
+	sys.Solution();
 	return 0;
 }
