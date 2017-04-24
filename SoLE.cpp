@@ -140,7 +140,7 @@ void Vector::Write(int i)
 {
 	if (i<=x)
 		cin >> a[i];
-	else throw "Cyka blyad'";
+	else throw "Wrong";
 }
 
 void Vector::Create(int x)
